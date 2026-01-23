@@ -9,6 +9,12 @@ export default {
   accent: '#C9A227',
   accentLight: '#F0D97A',
   
+  orange: '#F5A623',
+  orangeLight: '#FFBE5C',
+  orangeDark: '#E8941A',
+  orangeGradientStart: '#F5A623',
+  orangeGradientEnd: '#F08C00',
+  
   background: '#FEFEF9',
   backgroundWarm: '#FDF8F3',
   cardBackground: '#FFFFFF',

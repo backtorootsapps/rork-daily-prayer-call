@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { useUser } from '@/contexts/UserContext';
 import { TOPICS, TOPIC_CATEGORIES } from '@/constants/topics';
 import Colors from '@/constants/colors';
@@ -29,22 +29,21 @@ export default function TopicsScreen() {
 
   const handleContinue = () => {
     updateUser({ selectedTopics });
-    router.push('/onboarding/confirmation');
+    router.push('/onboarding/time');
   };
 
   const getTopicsByCategory = (categoryId: string) => {
     return TOPICS.filter(topic => topic.category === categoryId);
   };
 
+  const progress = 3 / 7;
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.backButton}
-        >
-          <ChevronLeft size={28} color={Colors.text} />
-        </TouchableOpacity>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
       </View>
 
       <ScrollView 
@@ -52,18 +51,15 @@ export default function TopicsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.stepIndicator}>
-          <View style={[styles.stepDot, styles.stepCompleted]} />
-          <View style={[styles.stepDot, styles.stepCompleted]} />
-          <View style={[styles.stepDot, styles.stepActive]} />
-          <View style={styles.stepDot} />
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>
+            {user.name ? `${user.name}, what` : 'what'}{' '}
+          </Text>
+          <Text style={[styles.title, styles.highlightText]}>weighs</Text>
+          <Text style={styles.title}> on your heart?</Text>
         </View>
-
-        <Text style={styles.title}>
-          {user.name ? `${user.name}, what` : 'What'} weighs on your heart?
-        </Text>
         <Text style={styles.subtitle}>
-          Select 1-3 areas where you need God&apos;s help most.
+          select 1-3 areas where you need God's help most
         </Text>
 
         <View style={styles.selectionCount}>
@@ -103,6 +99,9 @@ export default function TopicsScreen() {
                     >
                       {topic.name}
                     </Text>
+                    {isSelected && (
+                      <Check size={16} color={Colors.orange} />
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -121,7 +120,12 @@ export default function TopicsScreen() {
           disabled={selectedTopics.length === 0}
           activeOpacity={0.8}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={[
+            styles.continueButtonText,
+            selectedTopics.length === 0 && styles.continueButtonTextDisabled,
+          ]}>
+            continue
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -134,14 +138,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: -8,
+  progressBar: {
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.orange,
+    borderRadius: 2,
   },
   scrollView: {
     flex: 1,
@@ -151,30 +159,19 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 24,
   },
-  stepIndicator: {
+  titleContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 40,
-  },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.border,
-  },
-  stepActive: {
-    backgroundColor: Colors.primary,
-    width: 24,
-  },
-  stepCompleted: {
-    backgroundColor: Colors.primary,
+    flexWrap: 'wrap',
+    marginBottom: 8,
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: Colors.text,
-    marginBottom: 12,
+    lineHeight: 34,
+  },
+  highlightText: {
+    color: Colors.orange,
   },
   subtitle: {
     fontSize: 16,
@@ -183,7 +180,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   selectionCount: {
-    backgroundColor: Colors.primaryLight + '20',
+    backgroundColor: Colors.orange + '20',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -193,7 +190,7 @@ const styles = StyleSheet.create({
   selectionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.orange,
   },
   categorySection: {
     marginBottom: 24,
@@ -213,16 +210,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 12,
     backgroundColor: Colors.cardBackground,
-    borderWidth: 2,
-    borderColor: Colors.border,
     gap: 8,
   },
   topicButtonSelected: {
-    backgroundColor: Colors.primary + '15',
-    borderColor: Colors.primary,
+    backgroundColor: Colors.orange + '15',
+    borderWidth: 2,
+    borderColor: Colors.orange,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   topicButtonDisabled: {
     opacity: 0.4,
@@ -236,7 +234,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   topicNameSelected: {
-    color: Colors.primary,
+    color: Colors.orange,
     fontWeight: '600',
   },
   footer: {
@@ -246,17 +244,20 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   continueButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.orange,
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   continueButtonDisabled: {
-    backgroundColor: Colors.border,
+    backgroundColor: '#F5F5F5',
   },
   continueButtonText: {
     color: Colors.textInverse,
     fontSize: 18,
     fontWeight: '600',
+  },
+  continueButtonTextDisabled: {
+    color: Colors.textLight,
   },
 });

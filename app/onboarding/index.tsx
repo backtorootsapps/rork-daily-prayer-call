@@ -1,154 +1,188 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowRight } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
-export default function WelcomeScreen() {
+const LINES = [
+  { text: 'ever feel like your phone', highlight: false },
+  { text: 'gets more attention', highlight: false },
+  { text: 'than ', highlight: false, inline: true },
+  { text: 'God', highlight: true, inline: true },
+  { text: ' ?', highlight: false, inline: true },
+];
+
+const SUBLINES = [
+  "you're not alone",
+  'distractions are everywhere,',
+  'quietly pulling you away from the',
+  'peace you\'re looking for.',
+];
+
+export default function IntroScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [, setCurrentLine] = useState(0);
+  const [, setCurrentSubLine] = useState(-1);
+  const [showContinue, setShowContinue] = useState(false);
+  
+  const lineOpacities = useRef(LINES.map(() => new Animated.Value(0))).current;
+  const subLineOpacities = useRef(SUBLINES.map(() => new Animated.Value(0))).current;
+  const continueOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateLines = async () => {
+      for (let i = 0; i < LINES.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 500 : 300));
+        Animated.timing(lineOpacities[i], {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+        setCurrentLine(i + 1);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      for (let i = 0; i < SUBLINES.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        Animated.timing(subLineOpacities[i], {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+        setCurrentSubLine(i);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setShowContinue(true);
+      Animated.timing(continueOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    animateLines();
+  }, []);
+
+  const handleContinue = () => {
+    router.push('/onboarding/app-intro');
+  };
 
   return (
-    <LinearGradient
-      colors={['#F8F6F0', '#FEFEF9', '#F5F3ED']}
-      style={styles.container}
+    <TouchableOpacity 
+      style={styles.container} 
+      activeOpacity={1}
+      onPress={showContinue ? handleContinue : undefined}
     >
-      <View style={[styles.content, { paddingTop: insets.top + 60 }]}>
-        <View style={styles.iconContainer}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconEmoji}>🙏</Text>
+      <View style={[styles.content, { paddingTop: insets.top + 80 }]}>
+        <View style={styles.mainTextContainer}>
+          <View style={styles.lineRow}>
+            <Animated.Text style={[styles.mainText, { opacity: lineOpacities[0] }]}>
+              {LINES[0].text}
+            </Animated.Text>
           </View>
-          <View style={styles.glowRing} />
+          <View style={styles.lineRow}>
+            <Animated.Text style={[styles.mainText, { opacity: lineOpacities[1] }]}>
+              {LINES[1].text}
+            </Animated.Text>
+          </View>
+          <View style={styles.lineRow}>
+            <Animated.Text style={[styles.mainText, { opacity: lineOpacities[2] }]}>
+              than{' '}
+            </Animated.Text>
+            <Animated.Text style={[styles.mainText, styles.highlightText, { opacity: lineOpacities[3] }]}>
+              God
+            </Animated.Text>
+            <Animated.Text style={[styles.mainText, { opacity: lineOpacities[4] }]}>
+              {' '}?
+            </Animated.Text>
+          </View>
         </View>
 
-        <Text style={styles.title}>Daily Prayer Call</Text>
-        <Text style={styles.subtitle}>Your daily moment with God</Text>
-
-        <View style={styles.featuresContainer}>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>📖</Text>
-            <Text style={styles.featureText}>Personalized Bible verses</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>⏰</Text>
-            <Text style={styles.featureText}>Daily prayer reminders</Text>
-          </View>
-          <View style={styles.featureRow}>
-            <Text style={styles.featureIcon}>🔥</Text>
-            <Text style={styles.featureText}>Build your prayer streak</Text>
-          </View>
+        <View style={styles.subTextContainer}>
+          {SUBLINES.map((line, index) => (
+            <Animated.Text 
+              key={index} 
+              style={[styles.subText, { opacity: subLineOpacities[index] }]}
+            >
+              {line}
+            </Animated.Text>
+          ))}
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => router.push('/onboarding/name')}
-          activeOpacity={0.8}
+      <Animated.View 
+        style={[
+          styles.footer, 
+          { paddingBottom: insets.bottom + 24, opacity: continueOpacity }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.continueButton}
+          onPress={handleContinue}
+          activeOpacity={0.7}
         >
-          <Text style={styles.startButtonText}>Get Started</Text>
+          <Text style={styles.continueText}>tap to continue</Text>
+          <ArrowRight size={20} color={Colors.orange} />
         </TouchableOpacity>
-      </View>
-    </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
   },
-  iconContainer: {
-    marginBottom: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
+  mainTextContainer: {
+    marginBottom: 40,
   },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+  lineRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  glowRing: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 2,
-    borderColor: Colors.primaryLight,
-    opacity: 0.3,
-  },
-  iconEmoji: {
-    fontSize: 52,
-  },
-  title: {
+  mainText: {
     fontSize: 32,
     fontWeight: '700',
     color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
+    lineHeight: 42,
   },
-  subtitle: {
+  highlightText: {
+    color: Colors.orange,
+  },
+  subTextContainer: {
+    gap: 4,
+  },
+  subText: {
     fontSize: 18,
-    color: Colors.textSecondary,
-    marginBottom: 48,
-    textAlign: 'center',
-  },
-  featuresContainer: {
-    alignSelf: 'stretch',
-    gap: 20,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    gap: 16,
-  },
-  featureIcon: {
-    fontSize: 24,
-  },
-  featureText: {
-    fontSize: 16,
     color: Colors.text,
-    fontWeight: '500',
+    lineHeight: 28,
   },
   footer: {
     paddingHorizontal: 24,
+    alignItems: 'flex-end',
   },
-  startButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 18,
-    borderRadius: 16,
+  continueButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 8,
   },
-  startButtonText: {
-    color: Colors.textInverse,
-    fontSize: 18,
-    fontWeight: '600',
+  continueText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
   },
 });

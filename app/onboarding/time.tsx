@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Clock } from 'lucide-react-native';
+import { Clock } from 'lucide-react-native';
 import { useUser } from '@/contexts/UserContext';
 import Colors from '@/constants/colors';
 
@@ -18,7 +18,7 @@ const MINUTES = ['00', '15', '30', '45'];
 export default function TimeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, updateUser } = useUser();
+  const { updateUser } = useUser();
   const [selectedHour, setSelectedHour] = useState(7);
   const [selectedMinute, setSelectedMinute] = useState('00');
 
@@ -31,40 +31,33 @@ export default function TimeScreen() {
   const handleContinue = () => {
     const timeString = `${selectedHour.toString().padStart(2, '0')}:${selectedMinute}`;
     updateUser({ prayerTime: timeString });
-    router.push('/onboarding/topics');
+    router.push('/onboarding/summary');
   };
 
   const { display: hourDisplay, ampm } = formatHour(selectedHour);
+  const progress = 4 / 7;
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.backButton}
-        >
-          <ChevronLeft size={28} color={Colors.text} />
-        </TouchableOpacity>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
       </View>
 
       <View style={styles.content}>
-        <View style={styles.stepIndicator}>
-          <View style={[styles.stepDot, styles.stepCompleted]} />
-          <View style={[styles.stepDot, styles.stepActive]} />
-          <View style={styles.stepDot} />
-          <View style={styles.stepDot} />
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>when would you like your </Text>
+          <Text style={[styles.title, styles.highlightText]}>daily prayer call</Text>
+          <Text style={styles.title}>?</Text>
         </View>
-
-        <Text style={styles.title}>
-          {user.name ? `${user.name}, when` : 'When'} would you like your daily prayer call?
-        </Text>
         <Text style={styles.subtitle}>
-          Choose a time when you can pause and connect with God.
+          choose a time when you can pause and connect with God
         </Text>
 
         <View style={styles.timePickerContainer}>
           <View style={styles.clockIcon}>
-            <Clock size={32} color={Colors.primary} />
+            <Clock size={28} color={Colors.orange} />
           </View>
           
           <View style={styles.timeDisplay}>
@@ -147,7 +140,7 @@ export default function TimeScreen() {
           onPress={handleContinue}
           activeOpacity={0.8}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>continue</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -160,44 +153,37 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: -8,
+  progressBar: {
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.orange,
+    borderRadius: 2,
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
-  stepIndicator: {
+  titleContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 40,
-  },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.border,
-  },
-  stepActive: {
-    backgroundColor: Colors.primary,
-    width: 24,
-  },
-  stepCompleted: {
-    backgroundColor: Colors.primary,
+    flexWrap: 'wrap',
+    marginBottom: 8,
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: Colors.text,
-    marginBottom: 12,
+    lineHeight: 34,
+  },
+  highlightText: {
+    color: Colors.orange,
   },
   subtitle: {
     fontSize: 16,
@@ -207,15 +193,13 @@ const styles = StyleSheet.create({
   },
   timePickerContainer: {
     backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
     marginBottom: 32,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   clockIcon: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   timeDisplay: {
     flexDirection: 'row',
@@ -223,14 +207,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timeText: {
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.orange,
   },
   ampmText: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '600',
-    color: Colors.primaryLight,
+    color: Colors.orangeLight,
   },
   pickerSection: {
     marginBottom: 24,
@@ -252,14 +236,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: Colors.cardBackground,
-    borderWidth: 1,
-    borderColor: Colors.border,
     alignItems: 'center',
     marginRight: 8,
   },
   pickerItemSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.orange,
   },
   pickerItemText: {
     fontSize: 18,
@@ -283,13 +264,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     backgroundColor: Colors.cardBackground,
-    borderWidth: 1,
-    borderColor: Colors.border,
     alignItems: 'center',
   },
   minuteItemSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.orange,
   },
   minuteItemText: {
     fontSize: 18,
@@ -303,9 +281,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   continueButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.orange,
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   continueButtonText: {
