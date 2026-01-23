@@ -12,37 +12,35 @@ import { Check } from 'lucide-react-native';
 import { useUser } from '@/contexts/UserContext';
 import Colors from '@/constants/colors';
 
-const FAITH_VISIONS = [
-  { id: 'trust', emoji: '🤝', text: "trusting God's plan, even when it's hard" },
-  { id: 'integrity', emoji: '💯', text: 'living out my faith with integrity' },
-  { id: 'serve', emoji: '🙌', text: 'using my gifts to serve others' },
-  { id: 'word', emoji: '📖', text: 'building my life on the word of God' },
-  { id: 'community', emoji: '👥', text: 'growing in faith with community' },
-  { id: 'witness', emoji: '✨', text: 'being a witness to those around me' },
+const STRUGGLES = [
+  { id: 'lust', emoji: '🔥', text: 'struggling with lustful thoughts' },
+  { id: 'anxiety', emoji: '😰', text: 'constant worry or anxiety' },
+  { id: 'loneliness', emoji: '😔', text: 'feelings of loneliness or emptiness' },
+  { id: 'pride', emoji: '💪', text: 'pride or self-reliance' },
+  { id: 'anger', emoji: '😤', text: 'anger or unforgiveness' },
+  { id: 'doubt', emoji: '❓', text: 'doubt or questioning faith' },
 ];
 
-export default function FaithVisionScreen() {
+export default function DeeperStrugglesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { updateUser } = useUser();
-  const [selectedVisions, setSelectedVisions] = useState<string[]>([]);
+  const [selectedStruggles, setSelectedStruggles] = useState<string[]>([]);
 
-  const toggleVision = (visionId: string) => {
-    if (selectedVisions.includes(visionId)) {
-      setSelectedVisions(selectedVisions.filter(id => id !== visionId));
+  const toggleStruggle = (struggleId: string) => {
+    if (selectedStruggles.includes(struggleId)) {
+      setSelectedStruggles(selectedStruggles.filter(id => id !== struggleId));
     } else {
-      setSelectedVisions([...selectedVisions, visionId]);
+      setSelectedStruggles([...selectedStruggles, struggleId]);
     }
   };
 
   const handleContinue = () => {
-    if (selectedVisions.length > 0) {
-      updateUser({ faithVision: selectedVisions });
-      router.push('/onboarding/prayer-frequency');
-    }
+    updateUser({ deeperStruggles: selectedStruggles });
+    router.push('/onboarding/honesty-thanks');
   };
 
-  const progress = 2 / 7;
+  const progress = 5 / 12;
 
   return (
     <View style={styles.container}>
@@ -58,32 +56,33 @@ export default function FaithVisionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>thinking bigger, what does a </Text>
-          <Text style={[styles.title, styles.highlightText]}>thriving faith</Text>
-          <Text style={styles.title}> look like to you?</Text>
+          <Text style={styles.title}>sometimes, deeper struggles are the </Text>
+          <Text style={[styles.title, styles.highlightText]}>real root</Text>
+          <Text style={styles.title}>. do any of these get in your way?</Text>
         </View>
+        <Text style={styles.subtitle}>choose any that apply</Text>
 
         <View style={styles.optionsContainer}>
-          {FAITH_VISIONS.map((vision) => {
-            const isSelected = selectedVisions.includes(vision.id);
+          {STRUGGLES.map((struggle) => {
+            const isSelected = selectedStruggles.includes(struggle.id);
             
             return (
               <TouchableOpacity
-                key={vision.id}
+                key={struggle.id}
                 style={[
                   styles.optionButton,
                   isSelected && styles.optionButtonSelected,
                 ]}
-                onPress={() => toggleVision(vision.id)}
+                onPress={() => toggleStruggle(struggle.id)}
                 activeOpacity={0.7}
               >
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionEmoji}>{vision.emoji}</Text>
+                  <Text style={styles.optionEmoji}>{struggle.emoji}</Text>
                   <Text style={[
                     styles.optionText,
                     isSelected && styles.optionTextSelected,
                   ]}>
-                    {vision.text}
+                    {struggle.text}
                   </Text>
                 </View>
                 {isSelected && (
@@ -99,20 +98,11 @@ export default function FaithVisionScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            selectedVisions.length === 0 && styles.continueButtonDisabled,
-          ]}
+          style={styles.continueButton}
           onPress={handleContinue}
-          disabled={selectedVisions.length === 0}
           activeOpacity={0.8}
         >
-          <Text style={[
-            styles.continueButtonText,
-            selectedVisions.length === 0 && styles.continueButtonTextDisabled,
-          ]}>
-            continue
-          </Text>
+          <Text style={styles.continueButtonText}>continue</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -149,24 +139,29 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: Colors.text,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   highlightText: {
     color: Colors.orange,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginBottom: 24,
   },
   optionsContainer: {
     gap: 12,
   },
   optionButton: {
     backgroundColor: Colors.cardBackground,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -175,17 +170,17 @@ const styles = StyleSheet.create({
   optionButtonSelected: {
     borderWidth: 2,
     borderColor: Colors.orange,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   optionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 12,
+    gap: 14,
   },
   optionEmoji: {
-    fontSize: 24,
+    fontSize: 26,
   },
   optionText: {
     fontSize: 16,
@@ -211,15 +206,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  continueButtonDisabled: {
-    backgroundColor: '#F5F5F5',
-  },
   continueButtonText: {
     color: Colors.textInverse,
     fontSize: 18,
     fontWeight: '600',
-  },
-  continueButtonTextDisabled: {
-    color: Colors.textLight,
   },
 });

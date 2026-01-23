@@ -20,6 +20,12 @@ export interface User {
   goals: string[];
   faithVision: string[];
   screenTime: string;
+  prayerFrequency: number;
+  godRelationship: string;
+  faithObstacles: string[];
+  deeperStruggles: string[];
+  denomination: string;
+  gender: string;
 }
 
 export interface Topic {
@@ -72,4 +78,10 @@ export const DEFAULT_USER: User = {
   goals: [],
   faithVision: [],
   screenTime: '',
+  prayerFrequency: 4,
+  godRelationship: '',
+  faithObstacles: [],
+  deeperStruggles: [],
+  denomination: '',
+  gender: '',
 };
