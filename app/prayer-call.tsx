@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,32 +6,65 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  ScrollView,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Phone, X, Play, Pause } from 'lucide-react-native';
+import { 
+  Phone, 
+  X, 
+  Volume2, 
+  VolumeX,
+  BookOpen, 
+  MicOff, 
+  Mic,
+  Pause, 
+  Play,
+  FileText,
+  PhoneOff,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useUser } from '@/contexts/UserContext';
 import { TOPICS } from '@/constants/topics';
 import { getVersesByTopic } from '@/constants/verses';
-import Colors from '@/constants/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-type CallStep = 'incoming' | 'greeting' | 'context' | 'verse' | 'prayer-prompt' | 'prayer-time' | 'closing' | 'completion';
+type CallPhase = 'greeting' | 'context' | 'verse' | 'prayer-intro' | 'prayer-time' | 'closing' | 'amen';
+
+interface CallContent {
+  phase: CallPhase;
+  title: string;
+  subtitle?: string;
+  emoji?: string;
+}
 
 export default function PrayerCallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, incrementStreak } = useUser();
   
-  const [step, setStep] = useState<CallStep>('incoming');
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [currentPhase, setCurrentPhase] = useState<CallPhase>('greeting');
   const [selectedVerse, setSelectedVerse] = useState<{ reference: string; text: string } | null>(null);
-  const [prayerTimeRemaining, setPrayerTimeRemaining] = useState(120);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [showVerse, setShowVerse] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [prayerTimeRemaining, setPrayerTimeRemaining] = useState(120);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const contentFadeAnim = useRef(new Animated.Value(1)).current;
+  const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -39,42 +72,92 @@ export default function PrayerCallScreen() {
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
+  }, []);
 
   useEffect(() => {
-    if (step === 'incoming') {
+    if (!isCallActive) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 1000,
+            toValue: 1.15,
+            duration: 800,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1000,
+            duration: 800,
             useNativeDriver: true,
           }),
         ])
       );
+      
+      const ring = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ringAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ringAnim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      
       pulse.start();
-      return () => pulse.stop();
+      ring.start();
+      
+      return () => {
+        pulse.stop();
+        ring.stop();
+      };
     }
-  }, [step, pulseAnim]);
+  }, [isCallActive]);
 
   useEffect(() => {
-    if (step === 'prayer-time' && !isPaused && prayerTimeRemaining > 0) {
+    if (isCallActive && !isPaused) {
+      const timer = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [isCallActive, isPaused]);
+
+  useEffect(() => {
+    if (currentPhase === 'prayer-time' && !isPaused && prayerTimeRemaining > 0) {
       const timer = setInterval(() => {
         setPrayerTimeRemaining(prev => prev - 1);
       }, 1000);
       return () => clearInterval(timer);
-    } else if (prayerTimeRemaining === 0 && step === 'prayer-time') {
-      setStep('closing');
+    } else if (prayerTimeRemaining === 0 && currentPhase === 'prayer-time') {
+      transitionToPhase('closing');
     }
-  }, [step, isPaused, prayerTimeRemaining]);
+  }, [currentPhase, isPaused, prayerTimeRemaining]);
+
+  const transitionToPhase = useCallback((newPhase: CallPhase) => {
+    Animated.sequence([
+      Animated.timing(contentFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    setTimeout(() => {
+      setCurrentPhase(newPhase);
+    }, 200);
+  }, []);
 
   const handleAnswer = () => {
-    setStep('greeting');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsCallActive(true);
     
     const topicId = user.selectedTopics[0] || 'faith';
     const verses = getVersesByTopic(topicId);
@@ -83,195 +166,37 @@ export default function PrayerCallScreen() {
       setSelectedVerse({ reference: randomVerse.reference, text: randomVerse.text });
     }
 
-    setTimeout(() => setStep('context'), 3000);
+    setTimeout(() => transitionToPhase('context'), 4000);
   };
 
-  const handleSkip = () => {
+  const handleDecline = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
   };
 
-  const formatTime = (seconds: number) => {
+  const handleEndCall = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (currentPhase === 'amen') {
+      incrementStreak();
+      router.replace('/(main)/home');
+    } else {
+      transitionToPhase('amen');
+    }
+  };
+
+  const handleNextPhase = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const phases: CallPhase[] = ['greeting', 'context', 'verse', 'prayer-intro', 'prayer-time', 'closing', 'amen'];
+    const currentIndex = phases.indexOf(currentPhase);
+    if (currentIndex < phases.length - 1) {
+      transitionToPhase(phases[currentIndex + 1]);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getTopicName = () => {
-    const topic = TOPICS.find(t => t.id === user.selectedTopics[0]);
-    return topic?.name.toLowerCase() || 'your walk with God';
-  };
-
-  const renderStep = () => {
-    switch (step) {
-      case 'incoming':
-        return (
-          <View style={styles.incomingContainer}>
-            <Animated.View style={[styles.avatarRing, { transform: [{ scale: pulseAnim }] }]}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarEmoji}>🙏</Text>
-              </View>
-            </Animated.View>
-            
-            <Text style={styles.callerName}>Daily Prayer Call</Text>
-            <Text style={styles.callerSubtext}>Your moment with God</Text>
-
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={styles.declineButton}
-                onPress={handleSkip}
-              >
-                <X size={28} color="#FFF" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.answerButton}
-                onPress={handleAnswer}
-              >
-                <Phone size={28} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.swipeHint}>Tap to answer</Text>
-          </View>
-        );
-
-      case 'greeting':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.stepTitle}>🙏</Text>
-            <Text style={styles.greetingText}>
-              Good {getTimeOfDay()}, {user.name}.
-            </Text>
-            <Text style={styles.subText}>God is glad you are here.</Text>
-          </View>
-        );
-
-      case 'context':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.stepTitle}>💭</Text>
-            <Text style={styles.contextText}>
-              Today, let us bring your {getTopicName()} before the Lord.
-            </Text>
-            <TouchableOpacity 
-              style={styles.continueButton}
-              onPress={() => setStep('verse')}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'verse':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.verseLabel}>📖 Scripture for Today</Text>
-            <Text style={styles.verseReference}>{selectedVerse?.reference}</Text>
-            <Text style={styles.verseText}>{selectedVerse?.text}</Text>
-            <TouchableOpacity 
-              style={styles.continueButton}
-              onPress={() => setStep('prayer-prompt')}
-            >
-              <Text style={styles.continueButtonText}>Continue to Prayer</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'prayer-prompt':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.stepTitle}>🙏</Text>
-            <Text style={styles.promptTitle}>Time to Pray</Text>
-            <Text style={styles.promptText}>
-              {user.name}, take a moment to talk to God about what is on your heart.
-            </Text>
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={() => setStep('prayer-time')}
-            >
-              <Text style={styles.primaryButtonText}>Begin 2-Minute Prayer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.skipButton}
-              onPress={() => setStep('closing')}
-            >
-              <Text style={styles.skipButtonText}>Skip Prayer Time</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'prayer-time':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.timerLabel}>Prayer Time</Text>
-            <Text style={styles.timer}>{formatTime(prayerTimeRemaining)}</Text>
-            <Text style={styles.timerHint}>Speak to God in silence...</Text>
-            
-            <View style={styles.timerControls}>
-              <TouchableOpacity 
-                style={styles.timerButton}
-                onPress={() => setIsPaused(!isPaused)}
-              >
-                {isPaused ? (
-                  <Play size={32} color={Colors.primary} />
-                ) : (
-                  <Pause size={32} color={Colors.primary} />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.endEarlyButton}
-              onPress={() => setStep('closing')}
-            >
-              <Text style={styles.endEarlyText}>End Early</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'closing':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.stepTitle}>✨</Text>
-            <Text style={styles.closingTitle}>Amen</Text>
-            <Text style={styles.closingText}>
-              God hears you, {user.name}. He is with you today and always.
-            </Text>
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={() => {
-                incrementStreak();
-                setStep('completion');
-              }}
-            >
-              <Text style={styles.primaryButtonText}>Finish</Text>
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 'completion':
-        return (
-          <View style={styles.contentContainer}>
-            <Text style={styles.completionEmoji}>🎉</Text>
-            <Text style={styles.completionTitle}>Beautiful, {user.name}!</Text>
-            <Text style={styles.completionText}>
-              You have prayed {user.currentStreak + 1} days in a row.
-            </Text>
-            
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakNumber}>{user.currentStreak + 1}</Text>
-              <Text style={styles.streakLabel}>Day Streak 🔥</Text>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={() => router.replace('/(main)/home')}
-            >
-              <Text style={styles.primaryButtonText}>Return Home</Text>
-            </TouchableOpacity>
-          </View>
-        );
-    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const getTimeOfDay = () => {
@@ -281,22 +206,340 @@ export default function PrayerCallScreen() {
     return 'evening';
   };
 
+  const getTopicName = () => {
+    const topic = TOPICS.find(t => t.id === user.selectedTopics[0]);
+    return topic?.name.toLowerCase() || 'faith';
+  };
+
+  const getPhaseContent = (): CallContent => {
+    switch (currentPhase) {
+      case 'greeting':
+        return {
+          phase: 'greeting',
+          title: `Good ${getTimeOfDay()},\n${user.name}`,
+          subtitle: "Welcome to your daily prayer call. Let's spend a few moments together in God's presence.",
+          emoji: '🙏',
+        };
+      case 'context':
+        return {
+          phase: 'context',
+          title: `Praying for ${getTopicName()}`,
+          subtitle: `Today, let us bring your ${getTopicName()} before the Lord. He knows your heart and wants to meet you here.`,
+          emoji: '💭',
+        };
+      case 'verse':
+        return {
+          phase: 'verse',
+          title: selectedVerse?.reference || 'Scripture',
+          subtitle: selectedVerse?.text || '',
+          emoji: '📖',
+        };
+      case 'prayer-intro':
+        return {
+          phase: 'prayer-intro',
+          title: 'Time to Pray',
+          subtitle: `${user.name}, take a moment to talk to God about what's on your heart. He's listening.`,
+          emoji: '🙏',
+        };
+      case 'prayer-time':
+        return {
+          phase: 'prayer-time',
+          title: formatDuration(prayerTimeRemaining),
+          subtitle: 'Speak to God in silence... He hears every word of your heart.',
+          emoji: '✨',
+        };
+      case 'closing':
+        return {
+          phase: 'closing',
+          title: 'Amen',
+          subtitle: `God hears you, ${user.name}. He is with you today and always. Go in His peace.`,
+          emoji: '✨',
+        };
+      case 'amen':
+        return {
+          phase: 'amen',
+          title: `Beautiful, ${user.name}!`,
+          subtitle: `You've prayed ${user.currentStreak + 1} days in a row. Keep walking with Him! 🔥`,
+          emoji: '🎉',
+        };
+    }
+  };
+
+  const phases: CallPhase[] = ['greeting', 'context', 'verse', 'prayer-intro', 'prayer-time', 'closing', 'amen'];
+  const currentPhaseIndex = phases.indexOf(currentPhase);
+
+  const renderIncomingCall = () => (
+    <View style={styles.incomingContainer}>
+      <View style={styles.incomingTop}>
+        <Animated.View 
+          style={[
+            styles.ringEffect,
+            {
+              opacity: ringAnim.interpolate({
+                inputRange: [0, 0.5, 1],
+                outputRange: [0.6, 0.2, 0],
+              }),
+              transform: [{
+                scale: ringAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 2],
+                }),
+              }],
+            },
+          ]}
+        />
+        <Animated.View style={[styles.avatarRing, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarEmoji}>🙏</Text>
+          </View>
+        </Animated.View>
+        
+        <Text style={styles.callerName}>Daily Prayer Call</Text>
+        <Text style={styles.callerSubtext}>Your moment with God</Text>
+      </View>
+
+      <View style={[styles.incomingBottom, { paddingBottom: insets.bottom + 40 }]}>
+        <View style={styles.actionButtons}>
+          <View style={styles.actionButtonWrapper}>
+            <TouchableOpacity 
+              style={styles.declineButton}
+              onPress={handleDecline}
+              activeOpacity={0.8}
+            >
+              <PhoneOff size={28} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={styles.actionLabel}>Decline</Text>
+          </View>
+          
+          <View style={styles.actionButtonWrapper}>
+            <TouchableOpacity 
+              style={styles.answerButton}
+              onPress={handleAnswer}
+              activeOpacity={0.8}
+            >
+              <Phone size={28} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={styles.actionLabel}>Accept</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderActiveCall = () => {
+    const content = getPhaseContent();
+    
+    return (
+      <View style={styles.activeCallContainer}>
+        <View style={[styles.callHeader, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.durationBadge}>
+            <View style={styles.durationDot} />
+            <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
+          </View>
+          
+          <Text style={styles.callTitle}>Daily Prayer Call 🙏</Text>
+          <Text style={styles.callSubtitle}>Praying for {getTopicName()}</Text>
+        </View>
+
+        <Animated.View style={[styles.contentArea, { opacity: contentFadeAnim }]}>
+          <TouchableOpacity 
+            style={styles.contentTouchable} 
+            onPress={currentPhase !== 'prayer-time' && currentPhase !== 'amen' ? handleNextPhase : undefined}
+            activeOpacity={0.9}
+          >
+            {content.emoji && currentPhase !== 'prayer-time' && (
+              <Text style={styles.phaseEmoji}>{content.emoji}</Text>
+            )}
+            
+            <Text style={[
+              styles.contentTitle,
+              currentPhase === 'prayer-time' && styles.timerTitle,
+            ]}>
+              {content.title}
+            </Text>
+            
+            <Text style={styles.contentSubtitle}>{content.subtitle}</Text>
+            
+            {currentPhase === 'amen' && (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakNumber}>{user.currentStreak + 1}</Text>
+                <Text style={styles.streakLabel}>Day Streak 🔥</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+
+        <View style={styles.phaseDots}>
+          {phases.slice(0, -1).map((_, index) => (
+            <View 
+              key={index}
+              style={[
+                styles.phaseDot,
+                index <= currentPhaseIndex && styles.phaseDotActive,
+              ]}
+            />
+          ))}
+        </View>
+
+        <View style={[styles.controlsContainer, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.controlsRow}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isSpeakerOn && styles.controlButtonActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsSpeakerOn(!isSpeakerOn);
+              }}
+              activeOpacity={0.7}
+            >
+              {isSpeakerOn ? (
+                <Volume2 size={24} color="#FFF" />
+              ) : (
+                <VolumeX size={24} color="#FFF" />
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.controlButton, showVerse && styles.controlButtonActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowVerse(!showVerse);
+              }}
+              activeOpacity={0.7}
+            >
+              <BookOpen size={24} color="#FFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.controlButton, isMuted && styles.controlButtonActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsMuted(!isMuted);
+              }}
+              activeOpacity={0.7}
+            >
+              {isMuted ? (
+                <MicOff size={24} color="#FFF" />
+              ) : (
+                <Mic size={24} color="#FFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.controlsRowLabels}>
+            <Text style={styles.controlLabel}>Speaker</Text>
+            {'          '}
+            <Text style={styles.controlLabel}>Verse</Text>
+            {'          '}
+            <Text style={styles.controlLabel}>Mute</Text>
+          </Text>
+
+          <View style={styles.controlsRow}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isPaused && styles.controlButtonActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setIsPaused(!isPaused);
+              }}
+              activeOpacity={0.7}
+            >
+              {isPaused ? (
+                <Play size={24} color="#FFF" />
+              ) : (
+                <Pause size={24} color="#FFF" />
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.endCallButton}
+              onPress={handleEndCall}
+              activeOpacity={0.8}
+            >
+              <PhoneOff size={28} color="#FFF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.controlButton, showNotes && styles.controlButtonActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowNotes(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <FileText size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.controlsRowLabels}>
+            <Text style={styles.controlLabel}>{isPaused ? 'Resume' : 'Pause'}</Text>
+            {'                          '}
+            <Text style={styles.controlLabel}>Notes</Text>
+          </Text>
+        </View>
+
+        <Modal
+          visible={showVerse}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVerse(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowVerse(false)}
+          >
+            <View style={styles.verseModal}>
+              <Text style={styles.verseModalLabel}>📖 Today's Scripture</Text>
+              <Text style={styles.verseModalReference}>{selectedVerse?.reference}</Text>
+              <Text style={styles.verseModalText}>{selectedVerse?.text}</Text>
+              <TouchableOpacity 
+                style={styles.verseModalClose}
+                onPress={() => setShowVerse(false)}
+              >
+                <Text style={styles.verseModalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal
+          visible={showNotes}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowNotes(false)}
+        >
+          <KeyboardAvoidingView 
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={[styles.notesModal, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.notesHeader}>
+                <Text style={styles.notesTitle}>Prayer Notes</Text>
+                <TouchableOpacity onPress={() => setShowNotes(false)}>
+                  <X size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.notesInput}
+                multiline
+                placeholder="Write your thoughts, prayers, or reflections..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </View>
+    );
+  };
+
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={isCallActive ? ['#2d1b4e', '#1a1035', '#0d0a1a'] : ['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
-      <Animated.View style={[styles.content, { opacity: fadeAnim, paddingTop: insets.top }]}>
-        {step !== 'incoming' && (
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <X size={24} color="#FFF" />
-          </TouchableOpacity>
-        )}
-        
-        {renderStep()}
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {isCallActive ? renderActiveCall() : renderIncomingCall()}
       </Animated.View>
     </LinearGradient>
   );
@@ -309,23 +552,22 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 60,
-    right: 24,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   incomingContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  incomingTop: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+  },
+  ringEffect: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
   avatarRing: {
     width: 160,
@@ -349,20 +591,24 @@ const styles = StyleSheet.create({
     fontSize: 56,
   },
   callerName: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: '#FFF',
     marginBottom: 8,
   },
   callerSubtext: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 60,
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  incomingBottom: {
+    paddingHorizontal: 40,
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 48,
-    marginBottom: 32,
+    justifyContent: 'space-around',
+  },
+  actionButtonWrapper: {
+    alignItems: 'center',
   },
   declineButton: {
     width: 72,
@@ -371,6 +617,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E74C3C',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   answerButton: {
     width: 72,
@@ -379,191 +626,227 @@ const styles = StyleSheet.create({
     backgroundColor: '#27AE60',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
-  swipeHint: {
+  actionLabel: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.7)',
   },
-  contentContainer: {
+  activeCallContainer: {
     flex: 1,
+  },
+  callHeader: {
     alignItems: 'center',
+    paddingBottom: 16,
+  },
+  durationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  durationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#27AE60',
+    marginRight: 8,
+  },
+  durationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  callTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  callSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  contentArea: {
+    flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  stepTitle: {
-    fontSize: 64,
-    marginBottom: 24,
+  contentTouchable: {
+    alignItems: 'center',
   },
-  greetingText: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#FFF',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  subText: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.7)',
-    textAlign: 'center',
-  },
-  contextText: {
-    fontSize: 22,
-    color: '#FFF',
-    textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: 40,
-  },
-  verseLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  verseReference: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFF',
+  phaseEmoji: {
+    fontSize: 48,
     marginBottom: 20,
   },
-  verseText: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
-    lineHeight: 28,
-    marginBottom: 40,
-  },
-  promptTitle: {
+  contentTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: '#FFF',
-    marginBottom: 16,
-  },
-  promptText: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
-  },
-  continueButton: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  continueButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 18,
-    paddingHorizontal: 40,
-    borderRadius: 30,
     marginBottom: 16,
-    minWidth: width - 96,
-    alignItems: 'center',
+    lineHeight: 36,
   },
-  primaryButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  skipButton: {
-    paddingVertical: 12,
-  },
-  skipButtonText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 16,
-  },
-  timerLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  timer: {
-    fontSize: 72,
+  timerTitle: {
+    fontSize: 64,
     fontWeight: '200',
-    color: '#FFF',
-    marginBottom: 8,
+    letterSpacing: 4,
   },
-  timerHint: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: 40,
-  },
-  timerControls: {
-    marginBottom: 32,
-  },
-  timerButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  endEarlyButton: {
-    paddingVertical: 12,
-  },
-  endEarlyText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
-  },
-  closingTitle: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 16,
-  },
-  closingText: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.8)',
+  contentSubtitle: {
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.75)',
     textAlign: 'center',
     lineHeight: 26,
-    marginBottom: 40,
-  },
-  completionEmoji: {
-    fontSize: 80,
-    marginBottom: 24,
-  },
-  completionTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 12,
-  },
-  completionText: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 32,
+    paddingHorizontal: 8,
   },
   streakBadge: {
     backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 40,
+    marginTop: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   streakNumber: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: '700',
     color: '#FFF',
   },
   streakLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 4,
+  },
+  phaseDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 24,
+  },
+  phaseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  phaseDotActive: {
+    backgroundColor: '#FFF',
+  },
+  controlsContainer: {
+    paddingHorizontal: 24,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    marginBottom: 8,
+  },
+  controlsRowLabels: {
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  controlLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  controlButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlButtonActive: {
+    backgroundColor: 'rgba(139,92,246,0.5)',
+  },
+  endCallButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#E74C3C',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verseModal: {
+    backgroundColor: '#1a1035',
+    marginHorizontal: 24,
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  verseModalLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  verseModalReference: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 16,
+  },
+  verseModalText: {
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    lineHeight: 26,
+    marginBottom: 24,
+  },
+  verseModalClose: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+  },
+  verseModalCloseText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  notesModal: {
+    backgroundColor: '#1a1035',
+    marginTop: 'auto',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxHeight: height * 0.6,
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  notesTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  notesInput: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 16,
+    color: '#FFF',
+    minHeight: 200,
+    textAlignVertical: 'top',
   },
 });
