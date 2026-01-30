@@ -136,6 +136,39 @@ export default function PrayerCallScreen() {
     }
   }, [currentPhase, isPaused, prayerTimeRemaining]);
 
+  // Auto-progression through phases
+  useEffect(() => {
+    if (!isCallActive || isPaused) return;
+    
+    const phaseTimings: Partial<Record<CallPhase, number>> = {
+      'greeting': 4000,
+      'context': 5000,
+      'verse': 8000,
+      'prayer-intro': 5000,
+      'closing': 6000,
+    };
+    
+    const duration = phaseTimings[currentPhase];
+    if (!duration) return;
+    
+    const nextPhaseMap: Partial<Record<CallPhase, CallPhase>> = {
+      'greeting': 'context',
+      'context': 'verse',
+      'verse': 'prayer-intro',
+      'prayer-intro': 'prayer-time',
+      'closing': 'amen',
+    };
+    
+    const nextPhase = nextPhaseMap[currentPhase];
+    if (!nextPhase) return;
+    
+    const timer = setTimeout(() => {
+      transitionToPhase(nextPhase);
+    }, duration);
+    
+    return () => clearTimeout(timer);
+  }, [currentPhase, isCallActive, isPaused, transitionToPhase]);
+
   const transitionToPhase = useCallback((newPhase: CallPhase) => {
     Animated.sequence([
       Animated.timing(contentFadeAnim, {
@@ -165,8 +198,6 @@ export default function PrayerCallScreen() {
       const randomVerse = verses[Math.floor(Math.random() * verses.length)];
       setSelectedVerse({ reference: randomVerse.reference, text: randomVerse.text });
     }
-
-    setTimeout(() => transitionToPhase('context'), 4000);
   };
 
   const handleDecline = () => {
