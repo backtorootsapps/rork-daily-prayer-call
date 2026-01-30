@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  ScrollView,
   Modal,
   TextInput,
   KeyboardAvoidingView,
@@ -33,7 +32,7 @@ import { useUser } from '@/contexts/UserContext';
 import { TOPICS } from '@/constants/topics';
 import { getVersesByTopic } from '@/constants/verses';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 type CallPhase = 'greeting' | 'context' | 'verse' | 'prayer-intro' | 'prayer-time' | 'closing' | 'amen';
 
@@ -72,7 +71,7 @@ export default function PrayerCallScreen() {
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   useEffect(() => {
     if (!isCallActive) {
@@ -114,7 +113,7 @@ export default function PrayerCallScreen() {
         ring.stop();
       };
     }
-  }, [isCallActive]);
+  }, [isCallActive, pulseAnim, ringAnim]);
 
   useEffect(() => {
     if (isCallActive && !isPaused) {
@@ -125,6 +124,25 @@ export default function PrayerCallScreen() {
     }
   }, [isCallActive, isPaused]);
 
+  const transitionToPhase = useCallback((newPhase: CallPhase) => {
+    Animated.sequence([
+      Animated.timing(contentFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    setTimeout(() => {
+      setCurrentPhase(newPhase);
+    }, 200);
+  }, [contentFadeAnim]);
+
   useEffect(() => {
     if (currentPhase === 'prayer-time' && !isPaused && prayerTimeRemaining > 0) {
       const timer = setInterval(() => {
@@ -134,7 +152,7 @@ export default function PrayerCallScreen() {
     } else if (prayerTimeRemaining === 0 && currentPhase === 'prayer-time') {
       transitionToPhase('closing');
     }
-  }, [currentPhase, isPaused, prayerTimeRemaining]);
+  }, [currentPhase, isPaused, prayerTimeRemaining, transitionToPhase]);
 
   // Auto-progression through phases
   useEffect(() => {
@@ -168,25 +186,6 @@ export default function PrayerCallScreen() {
     
     return () => clearTimeout(timer);
   }, [currentPhase, isCallActive, isPaused, transitionToPhase]);
-
-  const transitionToPhase = useCallback((newPhase: CallPhase) => {
-    Animated.sequence([
-      Animated.timing(contentFadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentFadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    
-    setTimeout(() => {
-      setCurrentPhase(newPhase);
-    }, 200);
-  }, []);
 
   const handleAnswer = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -519,7 +518,7 @@ export default function PrayerCallScreen() {
             onPress={() => setShowVerse(false)}
           >
             <View style={styles.verseModal}>
-              <Text style={styles.verseModalLabel}>📖 Today's Scripture</Text>
+              <Text style={styles.verseModalLabel}>📖 Today&apos;s Scripture</Text>
               <Text style={styles.verseModalReference}>{selectedVerse?.reference}</Text>
               <Text style={styles.verseModalText}>{selectedVerse?.text}</Text>
               <TouchableOpacity 
