@@ -16,6 +16,7 @@ export interface User {
   topicLastPlayed: Record<string, string>;
   topicPlayCount: Record<string, number>;
   favoriteVerses: string[];
+  notificationsEnabled: boolean;
   ageRange: string;
   goals: string[];
   faithVision: string[];
@@ -74,6 +75,7 @@ export const DEFAULT_USER: User = {
   topicLastPlayed: {},
   topicPlayCount: {},
   favoriteVerses: [],
+  notificationsEnabled: true,
   ageRange: '',
   goals: [],
   faithVision: [],

@@ -3,6 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import { User, DEFAULT_USER } from '@/types';
+import {
+  requestNotificationPermissions,
+  scheduleDailyPrayerReminder,
+  cancelAllPrayerReminders,
+} from '@/utils/notifications';
 
 const USER_STORAGE_KEY = '@daily_prayer_user';
 
@@ -119,6 +124,48 @@ export const [UserProvider, useUser] = createContextHook(() => {
     });
   }, [saveUser]);
 
+  const setupNotifications = useCallback(async (enabled: boolean, prayerTime: string, userName: string) => {
+    if (enabled) {
+      const hasPermission = await requestNotificationPermissions();
+      if (hasPermission) {
+        await scheduleDailyPrayerReminder(prayerTime, userName);
+        console.log('[UserContext] Notifications scheduled for', prayerTime);
+      } else {
+        console.log('[UserContext] Notification permission denied');
+      }
+    } else {
+      await cancelAllPrayerReminders();
+      console.log('[UserContext] Notifications cancelled');
+    }
+  }, []);
+
+  const toggleNotifications = useCallback(async (enabled: boolean) => {
+    setUser(prev => {
+      const newUser = { ...prev, notificationsEnabled: enabled };
+      saveUser(newUser);
+      setupNotifications(enabled, prev.prayerTime, prev.name);
+      return newUser;
+    });
+  }, [saveUser, setupNotifications]);
+
+  const updatePrayerTime = useCallback(async (newTime: string) => {
+    setUser(prev => {
+      const newUser = { ...prev, prayerTime: newTime };
+      saveUser(newUser);
+      if (prev.notificationsEnabled) {
+        setupNotifications(true, newTime, prev.name);
+      }
+      return newUser;
+    });
+  }, [saveUser, setupNotifications]);
+
+  useEffect(() => {
+    if (user.onboardingComplete && user.notificationsEnabled && user.name) {
+      setupNotifications(true, user.prayerTime, user.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.onboardingComplete]);
+
   return {
     user,
     isLoading: userQuery.isLoading,
@@ -128,5 +175,8 @@ export const [UserProvider, useUser] = createContextHook(() => {
     checkAndResetDaily,
     recordTopicPlay,
     toggleFavoriteVerse,
+    toggleNotifications,
+    updatePrayerTime,
+    setupNotifications,
   };
 });

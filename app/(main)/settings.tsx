@@ -25,7 +25,7 @@ import Colors from '@/constants/colors';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, updateUser, resetStreak } = useUser();
+  const { user, updateUser, resetStreak, toggleNotifications } = useUser();
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -126,12 +126,18 @@ export default function SettingsScreen() {
                 <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
                   <Bell size={20} color="#4CAF50" />
                 </View>
-                <Text style={styles.settingLabel}>Notifications</Text>
+                <View>
+                  <Text style={styles.settingLabel}>Daily Reminder</Text>
+                  <Text style={styles.settingValue}>
+                    {user.notificationsEnabled ? `At ${formatTime(user.prayerTime)}` : 'Disabled'}
+                  </Text>
+                </View>
               </View>
               <Switch
-                value={true}
+                value={user.notificationsEnabled}
+                onValueChange={(value) => toggleNotifications(value)}
                 trackColor={{ false: Colors.border, true: Colors.primary + '50' }}
-                thumbColor={Colors.primary}
+                thumbColor={user.notificationsEnabled ? Colors.primary : Colors.textLight}
               />
             </View>
 
