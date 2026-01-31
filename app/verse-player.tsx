@@ -74,7 +74,7 @@ export default function VersePlayerScreen() {
 
     const audioUrl = currentVerse.audioUrl;
     
-    if (!audioUrl.startsWith('http')) {
+    if (!audioUrl || !audioUrl.startsWith('http')) {
       setError('Audio not available for this verse yet');
       console.log('Verse audio URL is not a full URL:', audioUrl);
       return;
@@ -89,6 +89,14 @@ export default function VersePlayerScreen() {
       }
 
       console.log('Loading audio from:', audioUrl);
+      
+      const response = await fetch(audioUrl, { method: 'HEAD' }).catch(() => null);
+      if (!response || !response.ok) {
+        console.log('Audio file not found at:', audioUrl);
+        setError('Audio file not uploaded yet. Read the verse for now.');
+        setIsLoading(false);
+        return;
+      }
       
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
@@ -113,8 +121,8 @@ export default function VersePlayerScreen() {
       console.error('Error playing audio:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       
-      if (errorMessage.includes('NotSupportedError') || errorMessage.includes('no supported source')) {
-        setError('Audio file not available. Please upload audio to project assets.');
+      if (errorMessage.includes('NotSupportedError') || errorMessage.includes('no supported source') || errorMessage.includes('404')) {
+        setError('Audio not uploaded yet. Read the verse for now.');
       } else {
         setError('Failed to play audio. Please try again.');
       }
@@ -267,7 +275,7 @@ export default function VersePlayerScreen() {
           <Text style={styles.tipTitle}>💡 Tip</Text>
           <Text style={styles.tipText}>
             {hasAudio 
-              ? "Press play to hear this verse. Let God's word sink deep into your heart."
+              ? "Press play to hear this verse. Let God&apos;s word sink deep into your heart."
               : "Take a moment to read and meditate on this verse. Audio will be available soon."}
           </Text>
         </View>
