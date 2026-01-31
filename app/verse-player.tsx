@@ -89,6 +89,7 @@ export default function VersePlayerScreen() {
       }
 
       console.log('Loading audio from:', audioUrl);
+      
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true },
@@ -97,6 +98,10 @@ export default function VersePlayerScreen() {
             if (status.didJustFinish) {
               setIsPlaying(false);
             }
+          } else if ('error' in status && status.error) {
+            console.error('Audio playback error:', status.error);
+            setError('Audio playback failed');
+            setIsPlaying(false);
           }
         }
       );
@@ -104,9 +109,15 @@ export default function VersePlayerScreen() {
       soundRef.current = sound;
       setIsPlaying(true);
       console.log('Audio started playing');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error playing audio:', err);
-      setError('Failed to play audio. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      
+      if (errorMessage.includes('NotSupportedError') || errorMessage.includes('no supported source')) {
+        setError('Audio file not available. Please upload audio to project assets.');
+      } else {
+        setError('Failed to play audio. Please try again.');
+      }
       setIsPlaying(false);
     } finally {
       setIsLoading(false);
