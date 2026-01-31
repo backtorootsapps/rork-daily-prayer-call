@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 import { useUser } from '@/contexts/UserContext';
 import { TOPICS } from '@/constants/topics';
 import { getVersesByTopic } from '@/constants/verses';
@@ -51,7 +52,7 @@ export default function PrayerCallScreen() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [currentPhase, setCurrentPhase] = useState<CallPhase>('greeting');
-  const [selectedVerse, setSelectedVerse] = useState<{ reference: string; text: string } | null>(null);
+  const [selectedVerse, setSelectedVerse] = useState<{ reference: string; text: string; audioUrl?: string } | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -59,6 +60,8 @@ export default function PrayerCallScreen() {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [prayerTimeRemaining, setPrayerTimeRemaining] = useState(120);
+  
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -71,6 +74,17 @@ export default function PrayerCallScreen() {
       duration: 500,
       useNativeDriver: true,
     }).start();
+    
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+    });
+    
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
   }, [fadeAnim]);
 
   useEffect(() => {
@@ -195,7 +209,11 @@ export default function PrayerCallScreen() {
     const verses = getVersesByTopic(topicId);
     if (verses.length > 0) {
       const randomVerse = verses[Math.floor(Math.random() * verses.length)];
-      setSelectedVerse({ reference: randomVerse.reference, text: randomVerse.text });
+      setSelectedVerse({ 
+        reference: randomVerse.reference, 
+        text: randomVerse.text,
+        audioUrl: randomVerse.audioUrl 
+      });
     }
   };
 
@@ -204,8 +222,15 @@ export default function PrayerCallScreen() {
     router.back();
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    
     if (currentPhase === 'amen') {
       incrementStreak();
       router.replace('/(main)/home');
@@ -222,6 +247,62 @@ export default function PrayerCallScreen() {
       transitionToPhase(phases[currentIndex + 1]);
     }
   };
+
+  useEffect(() => {
+    const playVerseAudio = async () => {
+      if (currentPhase === 'verse' && selectedVerse && 'audioUrl' in selectedVerse && selectedVerse.audioUrl) {
+        try {
+          console.log('Loading audio from:', selectedVerse.audioUrl);
+          
+          if (soundRef.current) {
+            await soundRef.current.unloadAsync();
+          }
+          
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: selectedVerse.audioUrl },
+            { shouldPlay: !isPaused, volume: isMuted ? 0 : 1.0 }
+          );
+          
+          soundRef.current = sound;
+          console.log('Audio loaded successfully');
+          
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              console.log('Audio finished playing');
+            }
+          });
+          
+        } catch (error) {
+          console.error('Error playing audio:', error);
+        }
+      }
+    };
+    
+    playVerseAudio();
+    
+    return () => {
+      if (soundRef.current && currentPhase !== 'verse') {
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    };
+  }, [currentPhase, selectedVerse, isPaused, isMuted]);
+  
+  useEffect(() => {
+    if (soundRef.current) {
+      soundRef.current.setIsMutedAsync(isMuted);
+    }
+  }, [isMuted]);
+  
+  useEffect(() => {
+    if (soundRef.current) {
+      if (isPaused) {
+        soundRef.current.pauseAsync();
+      } else {
+        soundRef.current.playAsync();
+      }
+    }
+  }, [isPaused]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
