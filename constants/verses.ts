@@ -510,6 +510,39 @@ export const VERSES: Verse[] = [
     audioUrl: 'https://rork.app/pa/pb572rr0huv0wxgy4ji2n/rom_12_18',
     duration: 10,
   },
+  
+  // Temptation
+  {
+    id: '1cor_10_13',
+    reference: '1 Corinthians 10:13',
+    text: 'No temptation has overtaken you except what is common to mankind. And God is faithful; he will not let you be tempted beyond what you can bear. But when you are tempted, he will also provide a way out so that you can endure it.',
+    tags: ['temptation', 'strength', 'faith', 'endurance'],
+    category: 'spiritual',
+    audioUrl: 'https://firebasestorage.googleapis.com/v0/b/admob-app-id-6381209483.firebasestorage.app/o/1cor_10_13.mp3?alt=media&token=47c3d32d-852b-454d-aeda-3b5f3d4b1112',
+    duration: 22,
+  },
+  
+  // Love
+  {
+    id: '1cor_13_4-7',
+    reference: '1 Corinthians 13:4-7',
+    text: 'Love is patient, love is kind. It does not envy, it does not boast, it is not proud. It does not dishonor others, it is not self-seeking, it is not easily angered, it keeps no record of wrongs. Love does not delight in evil but rejoices with the truth. It always protects, always trusts, always hopes, always perseveres.',
+    tags: ['love', 'relationships', 'kindness', 'patience'],
+    category: 'relationship',
+    audioUrl: 'https://firebasestorage.googleapis.com/v0/b/admob-app-id-6381209483.firebasestorage.app/o/1cor_13_4-7.mp3?alt=media&token=325012bd-9d33-44bc-8698-94c9d0e7ce47',
+    duration: 35,
+  },
+  
+  // Identity
+  {
+    id: '1john_3_1',
+    reference: '1 John 3:1',
+    text: 'See what great love the Father has lavished on us, that we should be called children of God! And that is what we are! The reason the world does not know us is that it did not know him.',
+    tags: ['love', 'identity', 'faith', 'encouragement'],
+    category: 'spiritual',
+    audioUrl: 'https://firebasestorage.googleapis.com/v0/b/admob-app-id-6381209483.firebasestorage.app/o/1john_3_1.mp3?alt=media&token=3d3ff705-746d-4690-b17f-ad516716e078',
+    duration: 18,
+  },
 ];
 
 export const getVersesByTopic = (topicId: string): Verse[] => {
