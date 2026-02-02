@@ -90,14 +90,6 @@ export default function VersePlayerScreen() {
 
       console.log('Loading audio from:', audioUrl);
       
-      const response = await fetch(audioUrl, { method: 'HEAD' }).catch(() => null);
-      if (!response || !response.ok) {
-        console.log('Audio file not found at:', audioUrl);
-        setError('Audio file not uploaded yet. Read the verse for now.');
-        setIsLoading(false);
-        return;
-      }
-      
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true },
