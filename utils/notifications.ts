@@ -50,10 +50,11 @@ export async function scheduleDailyPrayerReminder(
 
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
-        title: '🙏 Time for Prayer',
-        body: `${userName}, your daily prayer call is waiting. Take a moment to connect with God.`,
+        title: '🙏 Daily Prayer Call',
+        body: `${userName}, your moment with God is here. Answer the call.`,
         sound: true,
         data: { type: 'prayer_reminder' },
+        categoryIdentifier: 'prayer_call',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,

@@ -35,6 +35,8 @@ import { getVersesByTopic } from '@/constants/verses';
 
 const { height } = Dimensions.get('window');
 
+const PRAYER_CALL_RINGTONE_URL = 'https://firebasestorage.googleapis.com/v0/b/admob-app-id-6381209483.firebasestorage.app/o/prayer-call-ringtone.mp3?alt=media&token=3d793418-ab37-469c-becd-f08e1eb5ec64';
+
 type CallPhase = 'greeting' | 'context' | 'verse' | 'prayer-intro' | 'prayer-time' | 'closing' | 'amen';
 
 interface CallContent {
@@ -62,6 +64,7 @@ export default function PrayerCallScreen() {
   const [prayerTimeRemaining, setPrayerTimeRemaining] = useState(120);
   
   const soundRef = useRef<Audio.Sound | null>(null);
+  const ringtoneRef = useRef<Audio.Sound | null>(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -80,9 +83,29 @@ export default function PrayerCallScreen() {
       staysActiveInBackground: true,
     });
     
+    const playRingtone = async () => {
+      try {
+        console.log('Loading prayer call ringtone...');
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: PRAYER_CALL_RINGTONE_URL },
+          { shouldPlay: true, isLooping: true, volume: 1.0 }
+        );
+        ringtoneRef.current = sound;
+        console.log('Ringtone playing');
+      } catch (error) {
+        console.error('Error playing ringtone:', error);
+      }
+    };
+    
+    playRingtone();
+    
     return () => {
       if (soundRef.current) {
         soundRef.current.unloadAsync();
+      }
+      if (ringtoneRef.current) {
+        ringtoneRef.current.stopAsync();
+        ringtoneRef.current.unloadAsync();
       }
     };
   }, [fadeAnim]);
@@ -201,8 +224,15 @@ export default function PrayerCallScreen() {
     return () => clearTimeout(timer);
   }, [currentPhase, isCallActive, isPaused, transitionToPhase]);
 
-  const handleAnswer = () => {
+  const handleAnswer = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    if (ringtoneRef.current) {
+      await ringtoneRef.current.stopAsync();
+      await ringtoneRef.current.unloadAsync();
+      ringtoneRef.current = null;
+    }
+    
     setIsCallActive(true);
     
     const topicId = user.selectedTopics[0] || 'faith';
@@ -217,8 +247,15 @@ export default function PrayerCallScreen() {
     }
   };
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (ringtoneRef.current) {
+      await ringtoneRef.current.stopAsync();
+      await ringtoneRef.current.unloadAsync();
+      ringtoneRef.current = null;
+    }
+    
     router.back();
   };
 
