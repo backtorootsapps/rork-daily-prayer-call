@@ -10,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, Volume2 } from 'lucide-react-native';
+import { ArrowRight, Volume2, Pause, Play, SkipForward, SkipBack } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
+import { CONFESSION_AUDIOS } from '@/constants/confessions';
 
 const CONFESSION_TOPICS = [
   { id: 'health', name: 'Health', color: '#4ECDC4' },
@@ -208,6 +210,9 @@ Bubble.displayName = 'Bubble';
 export default function ConfessionsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const [selectedTopic, setSelectedTopic] = useState<ConfessionTopic | null>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   const cardAnim = useRef<Animated.Value>(new Animated.Value(0)).current;
   const translateX = useRef<Animated.Value>(new Animated.Value(0)).current;
@@ -259,10 +264,28 @@ export default function ConfessionsScreen() {
     translateX.setValue(initial);
   }, [bounds.maxX, bounds.minX, translateX]);
 
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        console.log('[Confessions] cleaning up audio');
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
+
   const handleTopicSelect = useCallback(
-    (topic: ConfessionTopic) => {
+    async (topic: ConfessionTopic) => {
       console.log('[Confessions] topic selected:', topic.id, topic.name);
+      
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+      
       setSelectedTopic(topic);
+      setIsPlaying(false);
+      setCurrentIndex(0);
+      
       Animated.spring(cardAnim, {
         toValue: 1,
         friction: 8,
@@ -273,12 +296,99 @@ export default function ConfessionsScreen() {
     [cardAnim]
   );
 
-  const handlePlayAudio = useCallback(() => {
+  const playAudio = useCallback(async (index: number) => {
+    if (!selectedTopic) return;
+    
+    const audios = CONFESSION_AUDIOS[selectedTopic.id] || [];
+    if (audios.length === 0) {
+      console.log('[Confessions] no audios for:', selectedTopic.id);
+      return;
+    }
+    
+    if (index < 0 || index >= audios.length) return;
+    
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+      
+      console.log('[Confessions] loading audio:', audios[index]);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audios[index] },
+        { shouldPlay: true },
+        (status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            console.log('[Confessions] audio finished, playing next');
+            if (index < audios.length - 1) {
+              setCurrentIndex(index + 1);
+            } else {
+              setIsPlaying(false);
+              setCurrentIndex(0);
+            }
+          }
+        }
+      );
+      
+      soundRef.current = sound;
+      setIsPlaying(true);
+      setCurrentIndex(index);
+    } catch (error) {
+      console.error('[Confessions] error playing audio:', error);
+    }
+  }, [selectedTopic]);
+
+  useEffect(() => {
+    if (isPlaying && currentIndex >= 0) {
+      playAudio(currentIndex);
+    }
+  }, [currentIndex]);
+
+  const handlePlayPause = useCallback(async () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    console.log('[Confessions] play audio for:', selectedTopic?.id, selectedTopic?.name);
-  }, [selectedTopic]);
+    
+    if (!selectedTopic) return;
+    
+    const audios = CONFESSION_AUDIOS[selectedTopic.id] || [];
+    if (audios.length === 0) return;
+    
+    if (isPlaying) {
+      if (soundRef.current) {
+        await soundRef.current.pauseAsync();
+      }
+      setIsPlaying(false);
+    } else {
+      if (soundRef.current) {
+        await soundRef.current.playAsync();
+        setIsPlaying(true);
+      } else {
+        await playAudio(currentIndex);
+      }
+    }
+  }, [selectedTopic, isPlaying, currentIndex, playAudio]);
+
+  const handleNext = useCallback(async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    if (!selectedTopic) return;
+    const audios = CONFESSION_AUDIOS[selectedTopic.id] || [];
+    if (currentIndex < audios.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  }, [selectedTopic, currentIndex]);
+
+  const handlePrevious = useCallback(async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  }, [currentIndex]);
 
   const panResponder = useMemo(() => {
     return PanResponder.create({
@@ -376,16 +486,43 @@ export default function ConfessionsScreen() {
             <View style={styles.cardContent}>
               <View style={styles.cardTextContainer}>
                 <Text style={[styles.cardTitle, { color: selectedTopic.color }]}>{selectedTopic.name}</Text>
-                <Text style={styles.cardDescription}>Tap play to hear confessions about {selectedTopic.name.toLowerCase()}</Text>
+                <Text style={styles.cardDescription}>
+                  {CONFESSION_AUDIOS[selectedTopic.id]?.length || 0} confessions • {currentIndex + 1}/{CONFESSION_AUDIOS[selectedTopic.id]?.length || 0}
+                </Text>
               </View>
-              <TouchableOpacity
-                testID="confessionsPlayButton"
-                style={[styles.playButton, { backgroundColor: selectedTopic.color }]}
-                onPress={handlePlayAudio}
-                activeOpacity={0.85}
-              >
-                <Volume2 size={24} color={getBubbleTextColor(selectedTopic.color)} />
-              </TouchableOpacity>
+              <View style={styles.controls}>
+                <TouchableOpacity
+                  testID="confessionsPreviousButton"
+                  style={styles.controlButton}
+                  onPress={handlePrevious}
+                  disabled={currentIndex === 0}
+                  activeOpacity={0.7}
+                >
+                  <SkipBack size={20} color={currentIndex === 0 ? '#555' : '#fff'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="confessionsPlayButton"
+                  style={[styles.playButton, { backgroundColor: selectedTopic.color }]}
+                  onPress={handlePlayPause}
+                  activeOpacity={0.85}
+                  disabled={(CONFESSION_AUDIOS[selectedTopic.id]?.length || 0) === 0}
+                >
+                  {isPlaying ? (
+                    <Pause size={24} color={getBubbleTextColor(selectedTopic.color)} />
+                  ) : (
+                    <Play size={24} color={getBubbleTextColor(selectedTopic.color)} />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="confessionsNextButton"
+                  style={styles.controlButton}
+                  onPress={handleNext}
+                  disabled={currentIndex >= (CONFESSION_AUDIOS[selectedTopic.id]?.length || 0) - 1}
+                  activeOpacity={0.7}
+                >
+                  <SkipForward size={20} color={currentIndex >= (CONFESSION_AUDIOS[selectedTopic.id]?.length || 0) - 1 ? '#555' : '#fff'} />
+                </TouchableOpacity>
+              </View>
             </View>
           </SafeAreaView>
         </Animated.View>
@@ -479,13 +616,24 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   cardContent: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
+    flexDirection: 'column' as const,
   },
   cardTextContainer: {
-    flex: 1,
-    marginRight: 16,
+    marginBottom: 16,
+  },
+  controls: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 20,
+  },
+  controlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   cardTitle: {
     fontSize: 20,
