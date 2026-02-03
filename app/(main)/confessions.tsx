@@ -74,10 +74,10 @@ type BubbleLayout = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const BUBBLE_SIZE = 92;
-const BUBBLE_GAP = 10;
+const BUBBLE_SIZE = 100;
+const BUBBLE_GAP = 25;
 const ROWS = 5;
-const ROW_VERTICAL_OVERLAP = 0.22;
+const ROW_VERTICAL_OVERLAP = 0.15;
 
 const getBubbleTextColor = (bgColor: string): string => {
   const hex = bgColor.replace('#', '');
@@ -92,10 +92,36 @@ interface BubbleProps {
   item: BubbleLayout;
   isSelected: boolean;
   onPress: (topic: ConfessionTopic) => void;
+  scrollX: Animated.Value;
+  windowWidth: number;
 }
 
-const Bubble = React.memo<BubbleProps>(({ item, isSelected, onPress }) => {
+const Bubble = React.memo<BubbleProps>(({ item, isSelected, onPress, scrollX, windowWidth }) => {
   const scaleAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
+
+  // Calculate position-based animations
+  // We want the bubble to scale up when it's in the center of the screen
+  // and translate slightly to create a fish-eye effect
+  
+  const itemCenter = item.x + BUBBLE_SIZE / 2;
+  const screenCenter = windowWidth / 2;
+  // The translateX value required to center this bubble
+  const centerOffset = screenCenter - itemCenter;
+  
+  // Range of influence - how far from center does the effect apply
+  const range = windowWidth * 0.8;
+  
+  const scrollScale = scrollX.interpolate({
+    inputRange: [centerOffset - range, centerOffset, centerOffset + range],
+    outputRange: [0.75, 1.4, 0.75],
+    extrapolate: 'clamp',
+  });
+
+  const scrollTranslateX = scrollX.interpolate({
+    inputRange: [centerOffset - range, centerOffset, centerOffset + range],
+    outputRange: [-40, 0, 40], // Push away from center
+    extrapolate: 'clamp',
+  });
 
   const handlePressIn = useCallback(() => {
     Animated.spring(scaleAnim, {
@@ -120,8 +146,11 @@ const Bubble = React.memo<BubbleProps>(({ item, isSelected, onPress }) => {
     onPress(item.topic);
   }, [item.topic, onPress]);
 
-  const size = isSelected ? BUBBLE_SIZE * 1.28 : BUBBLE_SIZE;
+  const size = isSelected ? BUBBLE_SIZE * 1.1 : BUBBLE_SIZE; // Reduced selection growth since we have zoom
   const radius = size / 2;
+
+  // Combine scaling
+  const finalScale = Animated.multiply(scaleAnim, scrollScale);
 
   return (
     <Animated.View
@@ -133,7 +162,10 @@ const Bubble = React.memo<BubbleProps>(({ item, isSelected, onPress }) => {
           width: BUBBLE_SIZE,
           height: BUBBLE_SIZE,
           zIndex: isSelected ? 50 : 1,
-          transform: [{ scale: scaleAnim }],
+          transform: [
+            { translateX: scrollTranslateX },
+            { scale: finalScale }
+          ],
         },
       ]}
       pointerEvents="box-none"
@@ -159,7 +191,7 @@ const Bubble = React.memo<BubbleProps>(({ item, isSelected, onPress }) => {
             styles.bubbleText,
             {
               color: getBubbleTextColor(item.topic.color),
-              fontSize: isSelected ? 15 : 12,
+              fontSize: 13, // Fixed base font size, scale handles the rest
             },
           ]}
           numberOfLines={2}
@@ -322,6 +354,8 @@ export default function ConfessionsScreen() {
               item={b}
               isSelected={selectedTopic?.id === b.topic.id}
               onPress={handleTopicSelect}
+              scrollX={translateX}
+              windowWidth={windowWidth}
             />
           ))}
         </Animated.View>
