@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Sparkles, Settings } from 'lucide-react-native';
+import { Home, Sparkles, Settings, MessageCircleHeart } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
 export default function MainLayout() {
@@ -32,6 +32,13 @@ export default function MainLayout() {
         options={{
           title: 'Verses',
           tabBarIcon: ({ color, size }) => <Sparkles size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="confessions"
+        options={{
+          title: 'Confessions',
+          tabBarIcon: ({ color, size }) => <MessageCircleHeart size={size} color={color} />,
         }}
       />
       <Tabs.Screen
